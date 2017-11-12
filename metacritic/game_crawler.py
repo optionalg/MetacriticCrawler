@@ -1,4 +1,5 @@
 import re
+import sys
 from game_item import Game
 from crawler import GameCrawler
 
@@ -37,7 +38,7 @@ def parse(response, crawler):
 				game = crawler.request('http://www.metacritic.com' + page[0].strip(), callback = parse_game_page)
 				
 		except KeyboardInterrupt:
-			crawler.exit('games.json')
+			crawler.exit()
 			
 	next_page = response.xpath('//span[@class="flipper next"]/a/@href')
 	if next_page:
@@ -46,5 +47,8 @@ def parse(response, crawler):
 urls = ['http://www.metacritic.com/browse/games/release-date/available/ps3/date']
 
 crawler = GameCrawler()
+if len(sys.argv) > 1:
+	crawler.path = sys.argv[1]
+
 for url in urls:
 	crawler.request(url, parse)
