@@ -78,9 +78,10 @@ class CrawlerMP:
 		self.game_queue = game_queue
 	
 	def download(self, url, retries = 0, callback = None):
-			
 		signal.signal(signal.SIGINT, signal.SIG_IGN)
+		
 		print ('downloading %s' %url)
+		
 		try:
 			page = requests.get(url, headers = self.headers)
 			if page.status_code == requests.codes.ok:
@@ -142,3 +143,81 @@ class CrawlerMP:
 		print('finished parsing current game page. Putting result into a queue')
 		self.game_queue.put(json.dumps(game.__dict__, indent = 4))
 		print('done.')
+
+class TestCrawler:
+	
+	def __init__(self):
+		self.headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'}
+	
+	def download(self, url, retries = 0, callback = None):
+		signal.signal(signal.SIGINT, signal.SIG_IGN)
+		print ('downloading %s' %url)
+		try:
+			page = requests.get(url, headers = self.headers)
+			if page.status_code == requests.codes.ok:
+				if callback is not None:
+					print('done. parsing the response')
+					return callback(html.fromstring(page.content))
+				else:
+					print('downloaded %s. and what now?' %url)
+			elif retries > 0:
+				return self.download(url, retries - 1, callback)
+			else:
+				print ('Warning: bad response code. Dropping the request')
+				return None
+		except requests.exceptions.RequestException as e:
+			if retries > 0:
+				return self.download(url, retries - 1, callback)
+			else:
+				print ('Error: unsolvable exception:\n"%s"\n' %e)
+				return None
+	
+	def game_list_parse(self, response):
+			
+		if response is None:
+			return None
+		
+		ret = {'links': [], 'next': None}
+		
+		print('getting game links')
+		for item in response.xpath('//div[@class="product_wrap"]'):
+			page = item.xpath('div[@class="basic_stat product_title"]/a/@href')
+			if page:
+				ret['links'].append('http://www.metacritic.com' + page[0].strip())
+			else:
+				print('invalid page')
+				return None
+		
+		print('done.\ngetting the next page')
+
+		next_page = response.xpath('//span[@class="flipper next"]/a/@href')
+		if next_page:
+			ret['next'] = 'http://www.metacritic.com' + next_page[0].strip()
+		print('done')
+		return ret
+			
+	def game_page_parse(self, response):
+			
+		if response is None:
+			return
+			
+		def check(path):
+			tmp = response.xpath(path)
+			return tmp[0].strip() if len(tmp) > 0 else 'tbd'
+		
+		game = Game()
+                
+		game.title = check('//div[@class="product_title"]/a/span/h1/text()')
+		game.platform = check('//div[@class="product_title"]/span/a/span/text()|//div[@class="product_title"]/span/span/text()')
+		game.released = check('//li[contains(@class, "release_data")]/span[@class="data"]/text()')	
+		game.reviews_count = check('//div[@class="section product_scores"]/div[@class="details main_details"]/div/div/div[@class="summary"]/p/span[@class="count"]/a/span/text()')
+		game.metascore = check('//div[@class="section product_scores"]/div[@class="details main_details"]/div/div/a/div/span/text()')
+		game.userscore = check('//div[@class="section product_scores"]/div[@class="details side_details"]/div[@class="score_summary"]/div/a/div/text()')
+		game.user_count = check('//div[@class="section product_scores"]/div[@class="details side_details"]/div[@class="score_summary"]/div/div[@class="summary"]/p/span[@class="count"]/a/text()')	
+		game.user_count = '0' if game.user_count == 'tbd' else re.findall('\d+', game.user_count)[0]
+		game.developer = check('//li[@class="summary_detail developer"]/span[@class="data"]/text()')
+		game.rating = check('//li[@class="summary_detail product_rating"]/span[@class="data"]/text()')
+		game.genres = response.xpath('//li[@class="summary_detail product_genre"]/span[@class="data"]/text()')
+							
+		return json.dumps(game.__dict__, indent = 4);
+
