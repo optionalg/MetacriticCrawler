@@ -5,6 +5,7 @@ import time
 from crawler import CrawlerMP
 
 def get_free(array):
+	'''
     r = []
     i = 0
     while i < len(array) - 1:
@@ -12,39 +13,43 @@ def get_free(array):
             r.append(array.pop(i))
         i += 1
     return r
-
+	'''
+	for i in range(len(array)):
+		if not array[i].is_alive(): return array.pop(i)
+	return None
+	
 def main():
 
-    global counter
-    counter = 0
-    out = open('output.json', 'w')
-    out.write('[\n')
+	global counter
+	counter = 0
+	out = open('output.json', 'w')
+	out.write('[\n')
     
-    mp.set_start_method('spawn')
-    manager = mp.Manager()
-    list_queue = manager.Queue()
-    game_queue = manager.Queue()
-    crawler = CrawlerMP(list_queue = list_queue, game_queue = game_queue)
-    workers = []
+	mp.set_start_method('fork')
+	manager = mp.Manager()
+	list_queue = manager.Queue()
+	game_queue = manager.Queue()
+	crawler = CrawlerMP(list_queue = list_queue, game_queue = game_queue)
+	workers = []
     
-    def output():
-        out.write(game_queue.get() + ',\n')
-        global counter
-        counter += 1
-        print('%4d games scrapped' %counter)
+	def output():
+		out.write(game_queue.get() + ',\n')
+		global counter
+		counter += 1
+		print('%4d games scrapped' %counter)
         
-    def exit(signum, frame):
-        while not game_queue.empty():
-            output()
-        out.write('\n]')
-        for proc in workers:
-            proc.terminate()
-        list_queue.close()
-        game_queue.close()
+	def exit(signum = 0, frame = 0):
+		while not game_queue.empty():
+			output()
+		out.write('\n]')
+		for proc in workers:
+			proc.terminate()
+		list_queue.close()
+		game_queue.close()
         
-    signal.signal(signal.SIGINT, exit)
+	signal.signal(signal.SIGINT, exit)
 
-    urls = [
+	urls = [
             'http://www.metacritic.com/browse/games/release-date/available/dreamcast/date',
             'http://www.metacritic.com/browse/games/release-date/available/ps/date',
             'http://www.metacritic.com/browse/games/release-date/available/ps2/date'
@@ -66,22 +71,26 @@ def main():
             'http://www.metacritic.com/browse/games/release-date/available/pc/date'
             ]
         
-    for url in urls:
-        proc = mp.Process(target=crawler.download, args=(url, 100, crawler.game_list_parse,))
-        workers.append(proc)
-        proc.start()
-    
-    while len(workers) > 0:
-        if not game_queue.empty():
-            output()
-        free = get_free(workers)
-        for proc in free:
-             while not list_queue.empty() and len(workers) < 8:
-                proc = mp.Process(target=crawler.download, args=(list_queue.get(), 5, crawler.game_page_parse,))
-                workers.append(proc)
-                proc.start()
+	for url in urls:
+		proc = mp.Process(target=crawler.download, args=(url, 100, crawler.game_list_parse,))
+		workers.append(proc)
+		proc.start()
+        
+	while len(workers) > 0:
+			
+		if not game_queue.empty():
+			output()
+		
+		proc = get_free(workers)
+		if proc is not None and not list_queue.empty() and len(workers) < 8:
+			proc = mp.Process(target=crawler.download, args=(list_queue.get(), 5, crawler.game_page_parse,))
+			workers.append(proc)
+			proc.start()
+		'''
+		for proc in get_free(workers):
+		'''
 
-    exit()
+	exit()
 
 if __name__ == '__main__':
     main()
