@@ -11,7 +11,7 @@ def parse_game_page(response, crawler):
 	game = Game()
 	
 	game.title = check('//div[@class="product_title"]/a/span/h1/text()')
-	game.platform = check('//div[@class="product_title"]/span/a/span/text()')
+	game.platform = check('//div[@class="product_title"]/span/a/span/text()|//div[@class="product_title"]/span/span/text()')
 	game.released = check('//li[contains(@class, "release_data")]/span[@class="data"]/text()')	
 	game.reviews_count = check('//div[@class="section product_scores"]/div[@class="details main_details"]/div/div/div[@class="summary"]/p/span[@class="count"]/a/span/text()')
 	game.metascore = check('//div[@class="section product_scores"]/div[@class="details main_details"]/div/div/a/div/span/text()')
@@ -34,7 +34,7 @@ def parse(response, crawler):
 			page = item.xpath('div[@class="basic_stat product_title"]/a/@href')
 			
 			if page:
-				game = crawler.request('http://www.metacritic.com' + page[0].strip(), callback = parse_game_page)
+				crawler.request('http://www.metacritic.com' + page[0].strip(), callback = parse_game_page)
 				
 		except KeyboardInterrupt:
 			crawler.exit()
@@ -47,10 +47,10 @@ urls = [
         'http://www.metacritic.com/browse/games/release-date/available/ps/date',
         'http://www.metacritic.com/browse/games/release-date/available/ps2/date',
         'http://www.metacritic.com/browse/games/release-date/available/ps3/date',
-        'http://www.metacritic.com/browse/games/release-date/available/playstation-4/date',
+        'http://www.metacritic.com/browse/games/release-date/available/ps4/date',
         'http://www.metacritic.com/browse/games/release-date/available/xbox/date',
         'http://www.metacritic.com/browse/games/release-date/available/xbox360/date',
-        'http://www.metacritic.com/browse/games/release-date/available/xbox-one/date',
+        'http://www.metacritic.com/browse/games/release-date/available/xboxone/date',
         'http://www.metacritic.com/browse/games/release-date/available/n64/date',
         'http://www.metacritic.com/browse/games/release-date/available/gamecube/date',
         'http://www.metacritic.com/browse/games/release-date/available/wii/date',
@@ -68,3 +68,5 @@ urls = [
 crawler = GameCrawler()
 for url in urls:
 	crawler.request(url, parse)
+
+crawler.exit()
