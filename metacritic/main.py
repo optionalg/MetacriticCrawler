@@ -15,13 +15,12 @@ def main():
         processes = 8
         pool = mp.Pool(processes = processes)
         print('%d processes spawned' %processes)
-        counter = 0
 
         def exit():
                 print('exiting...')
                 crawler.output(out)
                 out.write('\n]')
-                print('%d games crawled' %counter)
+                print('%d games crawled' %crawler.game_counter)
                 print('missed list urls:')
                 crawler.print_list_links()
                 print('missed game urls:')
