@@ -27,18 +27,18 @@ def main():
                 crawler.print_game_links()
 	
         while True:
-                for i in range(processes):
-                        try:
+                try:
+                        for i in range(processes):
                                 if crawler.urls:
                                         pool.apply_async(crawler.download, (crawler.urls.pop(0), 100, crawler.game_list_parse), callback = crawler.collect_links)
                                 elif crawler.game_links:
                                         pool.apply_async(crawler.download, (crawler.game_links.pop(0), 5, crawler.game_page_parse), callback = crawler.collect_games)
                                 crawler.output(out)
                                 
-                        except KeyboardInterrupt:
-                                print('keyboard interrupt catched')
-                                exit()
-                                raise KeyboardInterrupt
+                except KeyboardInterrupt:
+                        print('keyboard interrupt catched')
+                        exit()
+                        raise KeyboardInterrupt
 			
 		
 if __name__ == '__main__':
