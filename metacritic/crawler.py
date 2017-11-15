@@ -109,43 +109,38 @@ class Crawler:
 		return ret
 			
 	def game_page_parse(self, response, url):
-		if response is None:
-			return url
-		
-		main = response.xpath('//div[@id="main"]/div')[0]
-		if len(main) > 0: main = main[0]
-		else: return url
-                
-                head = main.xpath('div[@class="content_head product_content_head game_content_head"]')[0]
-                if len(head) > 0: head = head[0]
-		else: return url
-		
-                scores = main.xpath('div[@class="module product_data product_data_summary"]/div/div[@class="summary_wrap"]/div[@class="section product_scores"]')[0]
-                if len(scores) > 0: scores = scores[0]
-		else: return url
 
-                details = main.xpath('div[@class="module product_data product_data_summary"]/div/div[@class="summary_wrap"]/div[@class="section product_details"]/div[@class="details side_details"]/ul')[0]
-                if len(details) > 0: details = details[0]
-		else: return url
-		
-		def check(root, path):
+		def get_str(root, path):
 			tmp = root.xpath(path)
 			return tmp[0].strip() if len(tmp) > 0 else 'tbd'
 		
+		def get_root(root, path):
+			if root is None: return None
+			ret = root.xpath(path)
+			return ret[0] if len(ret) > 0 else None
+                
+		main = get_root(response, '//div[@id="main"]/div')
+		head = get_root(main, 'div[@class="content_head product_content_head game_content_head"]')
+		scores = get_root(main, 'div[@class="module product_data product_data_summary"]/div/div[@class="summary_wrap"]/div[@class="section product_scores"]')
+		details = get_root(main, 'div[@class="module product_data product_data_summary"]/div/div[@class="summary_wrap"]/div[@class="section product_details"]/div[@class="details side_details"]/ul')
+
+		if main is None or head is None or scores is None or details is None:
+			return url
+		
 		game = Game()
                 
-		game.title = check(head, 'div[@class="product_title"]/a/span/h1/text()')
-		game.platform = check(head, 'div[@class="product_title"]/span/a/span/text() | div[@class="product_title"]/span/span/text()')
-		game.released = check(head, 'div[@class="product_data"]/ul/li[@class="summary_detail release_data"]/span[@class="data"]/text()')	
+		game.title = get_str(head, 'div[@class="product_title"]/a/span/h1/text()')
+		game.platform = get_str(head, 'div[@class="product_title"]/span/a/span/text() | div[@class="product_title"]/span/span/text()')
+		game.released = get_str(head, 'div[@class="product_data"]/ul/li[@class="summary_detail release_data"]/span[@class="data"]/text()')	
 
-		game.metascore = check(scores, 'div[@class="details main_details"]/div/div/a/div/span/text()')
-		game.reviews_count = check(scores, 'div[@class="details main_details"]/div/div/div[@class="summary"]/p/span[@class="count"]/a/span/text()')
-		game.userscore = check(scores, 'div[@class="details side_details"]/div/div/a/div/text()')
-		game.user_count = check(scores, 'div[@class="details side_details"]/div/div/div[@class="summary"]/p/span[@class="count"]/a/text()')	
+		game.metascore = get_str(scores, 'div[@class="details main_details"]/div/div/a/div/span/text()')
+		game.reviews_count = get_str(scores, 'div[@class="details main_details"]/div/div/div[@class="summary"]/p/span[@class="count"]/a/span/text()')
+		game.userscore = get_str(scores, 'div[@class="details side_details"]/div/div/a/div/text()')
+		game.user_count = get_str(scores, 'div[@class="details side_details"]/div/div/div[@class="summary"]/p/span[@class="count"]/a/text()')	
 		game.user_count = '0' if game.user_count == 'tbd' else re.findall('\d+', game.user_count)[0]
 
-		game.developer = check(details, 'li[@class="summary_detail developer"]/span[@class="data"]/text()')
-		game.rating = check(details, 'li[@class="summary_detail product_rating"]/span[@class="data"]/text()')
+		game.developer = get_str(details, 'li[@class="summary_detail developer"]/span[@class="data"]/text()')
+		game.rating = get_str(details, 'li[@class="summary_detail product_rating"]/span[@class="data"]/text()')
 		game.genres = details.xpath('li[@class="summary_detail product_genre"]/span[@class="data"]/text()')
 							
 		return game.__dict__
