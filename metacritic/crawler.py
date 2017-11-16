@@ -52,7 +52,7 @@ class Crawler:
 
 	def output(self, file):
 		while self.games:
-			file.write((',\n' if self.game_counter > 0 else '') + self.games.pop(0))
+			file.write((',\n' if self.game_counter > 0 else '') + self.games.pop())
 			self.game_counter += 1
 			print('%4d games scrapped' %self.game_counter)
 			print('current execution time: %f' %(time.time() - self.startup))			
@@ -65,30 +65,31 @@ class Crawler:
 		for i in range(len(self.game_links)):
                         print('%3d: %s' %(i, self.game_links[i]))
 
-	def download(self, url, retries = 0):
+	def download(self, url, retries = 0, callback = None):
+		signal.signal(signal.SIGINT, signal.SIG_IGN)
 		print ('downloading %s' %url)
 		try:
 			page = requests.get(url, headers = self.headers)
 			if page.status_code == requests.codes.ok:
-                               return html.fromstring(page.content)
+				if callback is not None:
+					return callback(html.fromstring(page.content), url)
+				else:
+					print('downloaded %s. and what now?' %url)
 			elif retries > 0:
 				time.sleep(0.1)
 				return self.download(url, retries - 1, callback)
 			else:
 				print ('Warning: bad response code. Dropping the request')
-				return None
+				return url
 		except requests.exceptions.RequestException as e:
 			if retries > 0:
 				time.sleep(0.1)
 				return self.download(url, retries - 1, callback)
 			else:
 				print ('Error: unsolvable exception:\n"%s"\n' %e)
-				return None
-			
-	def game_list_parse(self, url):
-		signal.signal(signal.SIGINT, signal.SIG_IGN)
-		response = self.download(url, 100)
-                
+				return url
+	
+	def game_list_parse(self, response, url):
 		if response is None:
 			return url
 		
@@ -107,10 +108,8 @@ class Crawler:
 			ret['next'] = 'http://www.metacritic.com' + next_page[0].strip()
 		return ret
 			
-	def game_page_parse(self, url):
-		signal.signal(signal.SIGINT, signal.SIG_IGN)
-		response = self.download(url, 10)
-                
+	def game_page_parse(self, response, url):
+
 		def get_str(root, path):
 			tmp = root.xpath(path)
 			return tmp[0].strip() if len(tmp) > 0 else 'tbd'
