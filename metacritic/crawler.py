@@ -52,7 +52,7 @@ class Crawler:
 
 	def output(self, file):
 		while self.games:
-			file.write(',\n' + self.games.pop())
+			file.write((',\n' if self.game_counter > 0 else '') + self.games.pop(0))
 			self.game_counter += 1
 			print('%4d games scrapped' %self.game_counter)
 			print('current execution time: %f' %(time.time() - self.startup))			
@@ -65,31 +65,30 @@ class Crawler:
 		for i in range(len(self.game_links)):
                         print('%3d: %s' %(i, self.game_links[i]))
 
-	def download(self, url, retries = 0, callback = None):
-		signal.signal(signal.SIGINT, signal.SIG_IGN)
+	def download(self, url, retries = 0):
 		print ('downloading %s' %url)
 		try:
 			page = requests.get(url, headers = self.headers)
 			if page.status_code == requests.codes.ok:
-				if callback is not None:
-					return callback(html.fromstring(page.content), url)
-				else:
-					print('downloaded %s. and what now?' %url)
+                               return html.fromstring(page.content)
 			elif retries > 0:
 				time.sleep(0.1)
 				return self.download(url, retries - 1, callback)
 			else:
 				print ('Warning: bad response code. Dropping the request')
-				return url
+				return None
 		except requests.exceptions.RequestException as e:
 			if retries > 0:
 				time.sleep(0.1)
 				return self.download(url, retries - 1, callback)
 			else:
 				print ('Error: unsolvable exception:\n"%s"\n' %e)
-				return url
-	
-	def game_list_parse(self, response, url):
+				return None
+			
+	def game_list_parse(self, url):
+		signal.signal(signal.SIGINT, signal.SIG_IGN)
+		response = self.download(url, 100)
+                
 		if response is None:
 			return url
 		
@@ -106,30 +105,44 @@ class Crawler:
 		next_page = response.xpath('//span[@class="flipper next"]/a/@href')
 		if next_page:
 			ret['next'] = 'http://www.metacritic.com' + next_page[0].strip()
-		print('done')
 		return ret
 			
-	def game_page_parse(self, response, url):
-		if response is None:
-			return url
-			
-		def check(path):
-			tmp = response.xpath(path)
+	def game_page_parse(self, url):
+		signal.signal(signal.SIGINT, signal.SIG_IGN)
+		response = self.download(url, 10)
+                
+		def get_str(root, path):
+			tmp = root.xpath(path)
 			return tmp[0].strip() if len(tmp) > 0 else 'tbd'
+		
+		def get_root(root, path):
+			if root is None: return None
+			ret = root.xpath(path)
+			return ret[0] if len(ret) > 0 else None
+                
+		main = get_root(response, '//div[@id="main"]/div')
+		head = get_root(main, 'div[@class="content_head product_content_head game_content_head"]')
+		scores = get_root(main, 'div[@class="module product_data product_data_summary"]/div/div[@class="summary_wrap"]/div[@class="section product_scores"]')
+		details = get_root(main, 'div[@class="module product_data product_data_summary"]/div/div[@class="summary_wrap"]/div[@class="section product_details"]/div[@class="details side_details"]/ul')
+
+		if main is None or head is None or scores is None or details is None:
+			return url
 		
 		game = Game()
                 
-		game.title = check('//div[@class="product_title"]/a/span/h1/text()')
-		game.platform = check('//div[@class="product_title"]/span/a/span/text()|//div[@class="product_title"]/span/span/text()')
-		game.released = check('//li[contains(@class, "release_data")]/span[@class="data"]/text()')	
-		game.reviews_count = check('//div[@class="section product_scores"]/div[@class="details main_details"]/div/div/div[@class="summary"]/p/span[@class="count"]/a/span/text()')
-		game.metascore = check('//div[@class="section product_scores"]/div[@class="details main_details"]/div/div/a/div/span/text()')
-		game.userscore = check('//div[@class="section product_scores"]/div[@class="details side_details"]/div[@class="score_summary"]/div/a/div/text()')
-		game.user_count = check('//div[@class="section product_scores"]/div[@class="details side_details"]/div[@class="score_summary"]/div/div[@class="summary"]/p/span[@class="count"]/a/text()')	
+		game.title = get_str(head, 'div[@class="product_title"]/a/span/h1/text()')
+		game.platform = get_str(head, 'div[@class="product_title"]/span/a/span/text() | div[@class="product_title"]/span/span/text()')
+		game.released = get_str(head, 'div[@class="product_data"]/ul/li[@class="summary_detail release_data"]/span[@class="data"]/text()')	
+
+		game.metascore = get_str(scores, 'div[@class="details main_details"]/div/div/a/div/span/text()')
+		game.reviews_count = get_str(scores, 'div[@class="details main_details"]/div/div/div[@class="summary"]/p/span[@class="count"]/a/span/text()')
+		game.userscore = get_str(scores, 'div[@class="details side_details"]/div/div/a/div/text()')
+		game.user_count = get_str(scores, 'div[@class="details side_details"]/div/div/div[@class="summary"]/p/span[@class="count"]/a/text()')	
 		game.user_count = '0' if game.user_count == 'tbd' else re.findall('\d+', game.user_count)[0]
-		game.developer = check('//li[@class="summary_detail developer"]/span[@class="data"]/text()')
-		game.rating = check('//li[@class="summary_detail product_rating"]/span[@class="data"]/text()')
-		game.genres = response.xpath('//li[@class="summary_detail product_genre"]/span[@class="data"]/text()')
+
+		game.developer = get_str(details, 'li[@class="summary_detail developer"]/span[@class="data"]/text()')
+		game.rating = get_str(details, 'li[@class="summary_detail product_rating"]/span[@class="data"]/text()')
+		game.genres = details.xpath('li[@class="summary_detail product_genre"]/span[@class="data"]/text()')
 							
 		return game.__dict__
 
