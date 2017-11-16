@@ -106,47 +106,30 @@ class Crawler:
 		next_page = response.xpath('//span[@class="flipper next"]/a/@href')
 		if next_page:
 			ret['next'] = 'http://www.metacritic.com' + next_page[0].strip()
+		print('done')
 		return ret
 			
 	def game_page_parse(self, response, url):
 		if response is None:
 			return url
-		
-		main = response.xpath('//div[@id="main"]/div')[0]
-		if len(main) > 0: main = main[0]
-		else: return url
-                
-                head = main.xpath('div[@class="content_head product_content_head game_content_head"]')[0]
-                if len(head) > 0: head = head[0]
-		else: return url
-		
-                scores = main.xpath('div[@class="module product_data product_data_summary"]/div/div[@class="summary_wrap"]/div[@class="section product_scores"]')[0]
-                if len(scores) > 0: scores = scores[0]
-		else: return url
-
-                details = main.xpath('div[@class="module product_data product_data_summary"]/div/div[@class="summary_wrap"]/div[@class="section product_details"]/div[@class="details side_details"]/ul')[0]
-                if len(details) > 0: details = details[0]
-		else: return url
-		
-		def check(root, path):
-			tmp = root.xpath(path)
+			
+		def check(path):
+			tmp = response.xpath(path)
 			return tmp[0].strip() if len(tmp) > 0 else 'tbd'
 		
 		game = Game()
                 
-		game.title = check(head, 'div[@class="product_title"]/a/span/h1/text()')
-		game.platform = check(head, 'div[@class="product_title"]/span/a/span/text() | div[@class="product_title"]/span/span/text()')
-		game.released = check(head, 'div[@class="product_data"]/ul/li[@class="summary_detail release_data"]/span[@class="data"]/text()')	
-
-		game.metascore = check(scores, 'div[@class="details main_details"]/div/div/a/div/span/text()')
-		game.reviews_count = check(scores, 'div[@class="details main_details"]/div/div/div[@class="summary"]/p/span[@class="count"]/a/span/text()')
-		game.userscore = check(scores, 'div[@class="details side_details"]/div/div/a/div/text()')
-		game.user_count = check(scores, 'div[@class="details side_details"]/div/div/div[@class="summary"]/p/span[@class="count"]/a/text()')	
+		game.title = check('//div[@class="product_title"]/a/span/h1/text()')
+		game.platform = check('//div[@class="product_title"]/span/a/span/text()|//div[@class="product_title"]/span/span/text()')
+		game.released = check('//li[contains(@class, "release_data")]/span[@class="data"]/text()')	
+		game.reviews_count = check('//div[@class="section product_scores"]/div[@class="details main_details"]/div/div/div[@class="summary"]/p/span[@class="count"]/a/span/text()')
+		game.metascore = check('//div[@class="section product_scores"]/div[@class="details main_details"]/div/div/a/div/span/text()')
+		game.userscore = check('//div[@class="section product_scores"]/div[@class="details side_details"]/div[@class="score_summary"]/div/a/div/text()')
+		game.user_count = check('//div[@class="section product_scores"]/div[@class="details side_details"]/div[@class="score_summary"]/div/div[@class="summary"]/p/span[@class="count"]/a/text()')	
 		game.user_count = '0' if game.user_count == 'tbd' else re.findall('\d+', game.user_count)[0]
-
-		game.developer = check(details, 'li[@class="summary_detail developer"]/span[@class="data"]/text()')
-		game.rating = check(details, 'li[@class="summary_detail product_rating"]/span[@class="data"]/text()')
-		game.genres = details.xpath('li[@class="summary_detail product_genre"]/span[@class="data"]/text()')
+		game.developer = check('//li[@class="summary_detail developer"]/span[@class="data"]/text()')
+		game.rating = check('//li[@class="summary_detail product_rating"]/span[@class="data"]/text()')
+		game.genres = response.xpath('//li[@class="summary_detail product_genre"]/span[@class="data"]/text()')
 							
 		return game.__dict__
 
