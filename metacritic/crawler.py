@@ -52,7 +52,7 @@ class Crawler:
 
 	def output(self, file):
 		while self.games:
-			file.write((',\n' if self.game_counter > 0 else '') + self.games.pop())
+			file.write(',\n' + self.games.pop())
 			self.game_counter += 1
 			print('%4d games scrapped' %self.game_counter)
 			print('current execution time: %f' %(time.time() - self.startup))			
